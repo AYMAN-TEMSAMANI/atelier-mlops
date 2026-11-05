@@ -1,0 +1,14 @@
+{
+    "RandomForest_Iris": {
+        "accuracy": 0.9,
+        "precision": 0.9023569023569024,
+        "recall": 0.9,
+        "f1_score": 0.8997493734335839
+    },
+    "KNN_Iris": {
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0
+    }
+}
