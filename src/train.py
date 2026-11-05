@@ -3,61 +3,66 @@ import yaml
 import json
 import joblib
 import mlflow
+import mlflow.sklearn
 import pandas as pd
-
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score, f1_score
-)
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
-with open("params.yaml", "r") as file:
-    params = yaml.safe_load(file)["train"]
+with open("params.yaml", "r") as f:
+    params = yaml.safe_load(f)["train"]
 
 df = pd.read_csv("data/raw/iris.csv")
 X = df.drop("target", axis=1)
 y = df["target"]
-
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=params["test_size"],
-    random_state=params["random_state"], stratify=y
+    X, y, test_size=params["test_size"], random_state=params["random_state"], stratify=y
 )
 
 mlflow.set_tracking_uri("sqlite:///mlflow.db")
 mlflow.set_experiment("TP_Iris_Classification")
 
-with mlflow.start_run(run_name="RandomForest_Iris"):
-    model = RandomForestClassifier(
+dataset = mlflow.data.from_pandas(df, targets="target", name="iris_dataset")
+
+models = {
+    "RandomForest_Iris": RandomForestClassifier(
         n_estimators=params["n_estimators"],
         max_depth=params["max_depth"],
         random_state=params["random_state"]
+    ),
+    "KNN_Iris": KNeighborsClassifier(
+        n_neighbors=params.get("n_neighbors", 5)
     )
-    model.fit(X_train, y_train)
-    predictions = model.predict(X_test)
+}
 
-    metrics = {
-        "accuracy": accuracy_score(y_test, predictions),
-        "precision": precision_score(
-            y_test, predictions, average="weighted"
-        ),
-        "recall": recall_score(
-            y_test, predictions, average="weighted"
-        ),
-        "f1_score": f1_score(
-            y_test, predictions, average="weighted"
+all_m = {}
+for name, m in models.items():
+    with mlflow.start_run(run_name=name):
+        mlflow.log_input(dataset, context="training")
+        m.fit(X_train, y_train)
+        pred = m.predict(X_test)
+        metrics = {
+            "accuracy": float(accuracy_score(y_test, pred)),
+            "precision": float(precision_score(y_test, pred, average="weighted")),
+            "recall": float(recall_score(y_test, pred, average="weighted")),
+            "f1_score": float(f1_score(y_test, pred, average="weighted"))
+        }
+        mlflow.log_params(params)
+        mlflow.log_metrics(metrics)
+
+        mlflow.sklearn.log_model(
+            sk_model=m,
+            artifact_path="model",
+            registered_model_name=f"{name}_Model"
         )
-    }
+        all_m[name] = metrics
 
-    mlflow.log_params(params)
-    mlflow.log_metrics(metrics)
+os.makedirs("models", exist_ok=True)
+joblib.dump(models["RandomForest_Iris"], "models/model.pkl")
 
-    os.makedirs("models", exist_ok=True)
-    joblib.dump(model, "models/model.pkl")
-    mlflow.log_artifact("models/model.pkl", artifact_path="model")
+os.makedirs("reports", exist_ok=True)
+with open("reports/metrics.json", "w") as f:
+    json.dump(all_m, f, indent=4)
 
-    os.makedirs("reports", exist_ok=True)
-    with open("reports/metrics.json", "w") as f:
-        json.dump(metrics, f, indent=4)
-
-    print("Métriques :", metrics)
-    print("Modèle entraîné et enregistré.")
+print("Entraînement terminé :", all_m)
