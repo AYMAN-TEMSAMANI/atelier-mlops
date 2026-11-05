@@ -54,7 +54,8 @@ for name, m in models.items():
         mlflow.sklearn.log_model(
             sk_model=m,
             artifact_path="model",
-            registered_model_name=f"{name}_Model"
+            registered_model_name=f"{name}_Model",
+            skops_trusted_types=["sklearn.tree._tree.Tree"]
         )
         all_m[name] = metrics
 
