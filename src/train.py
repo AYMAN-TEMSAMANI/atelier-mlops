@@ -23,7 +23,8 @@ X_train, X_test, y_train, y_test = train_test_split(
 mlflow.set_tracking_uri("sqlite:///mlflow.db")
 mlflow.set_experiment("TP_Iris_Classification")
 
-dataset = mlflow.data.from_pandas(df, targets="target", name="iris_dataset")
+# Dataset avec le chemin source pour lier le fichier
+dataset = mlflow.data.from_pandas(df, source="data/raw/iris.csv", targets="target", name="iris_dataset")
 
 models = {
     "RandomForest_Iris": RandomForestClassifier(
@@ -35,6 +36,8 @@ models = {
         n_neighbors=params.get("n_neighbors", 5)
     )
 }
+
+trusted_types = ["sklearn.tree._tree.Tree", "sklearn.neighbors._classification.KNeighborsClassifier"]
 
 all_m = {}
 for name, m in models.items():
@@ -55,7 +58,7 @@ for name, m in models.items():
             sk_model=m,
             artifact_path="model",
             registered_model_name=f"{name}_Model",
-            skops_trusted_types=["sklearn.tree._tree.Tree"]
+            skops_trusted_types=trusted_types
         )
         all_m[name] = metrics
 
